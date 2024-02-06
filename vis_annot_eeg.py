@@ -1,5 +1,4 @@
 
-import os
 import numpy as np
 import pandas as pd
 
@@ -97,23 +96,9 @@ class Annotation:
                 print('draw annotation')
                 print(annot_export.shape)
         return annot_export
-    
-#folder_path= 'c:/Users/annie/Desktop/OHCA_data/P10'
-# reader= EEGDataloader()
-# folder_path= "J:/我的雲端硬碟/thesis/OHCA_data/P10"
-# file_path= os.path.join(folder_path, 'EEG1_nonseizure1.txt')
-# data_ch1, time_ch1= reader.load_txt(file_path)
-# file_path= os.path.join(folder_path, 'EEG2_nonseizure1.txt')
-# data_ch2, time_ch2= reader.load_txt(file_path)
-# assert data_ch1.shape== data_ch2.shape
 
 patient=10
 sf=128
-# x_values_row = np.arange(0,len(data_ch1),1)
-# y_values_row_ch1 = data_ch1
-# y_values_row_ch2 = data_ch2
-# print(y_values_row_ch1.shape)
-
 eeg_loader= EEGDataloader()
 annot_export= pd.DataFrame(columns=['patient', 'start_idx', 'start_time', 'end_idx','end_time','duration_ms'])
 annotation = Annotation(sf, patient)
