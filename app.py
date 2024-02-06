@@ -78,8 +78,7 @@ class Annotation:
     
         # annot_export is empty then add annot directly
         if annot_export.shape[0]==0:
-
-            annot_export= annot_export.append(current_annotation,ignore_index=True)
+            annot_export = pd.concat([annot_export, current_annotation], ignore_index=True)
             print('draw annotation')
             print(annot_export.shape)
         else:
@@ -92,7 +91,7 @@ class Annotation:
                 print(f"Erase row {matching_row_idx} annotation ")
                 print(annot_export.shape)
             else:
-                annot_export= annot_export.append(current_annotation,ignore_index=True)
+                annot_export = pd.concat([annot_export, current_annotation], ignore_index=True)
                 print('draw annotation')
                 print(annot_export.shape)
         return annot_export
@@ -264,7 +263,7 @@ def export_csv(n_clicks, time_ch1):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=False, host= '0.0.0.0',port=8080)
 
 
 
