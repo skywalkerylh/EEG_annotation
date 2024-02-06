@@ -166,30 +166,10 @@ app.layout = html.Div([
     html.Div(id='ch2-data', style={'display': 'none'}),
     html.Div(id='ch2-time', style={'display': 'none'})
 ])
-@app.callback(
-    [Output('ch1-data', 'children'),
-     Output('ch1-time', 'children')],
-    [Input('upload-ch1', 'contents')]
-)
-def load_ch1(contents):
-    if contents is None:
-        raise PreventUpdate
-    reader= EEGDataloader()
-    return reader.load_txt_by_buttom(contents)
-
-@app.callback(
-    [Output('ch2-data', 'children'),
-     Output('ch2-time', 'children')],
-    [Input('upload-ch2', 'contents')]
-)
-def load_ch2(contents):
-    if contents is None:
-        raise PreventUpdate
-    reader= EEGDataloader()
-    return reader.load_txt_by_buttom(contents)
 # Define callback to update graph
 @app.callback(
-    Output('plot-container', 'figure'),
+    [Output('plot-container', 'figure'),
+     Output('ch1-time', 'children')],
     [Input('update-button', 'n_clicks'),
      Input('ch1-data', 'children'),
      Input('ch1-time', 'children'),
@@ -197,14 +177,21 @@ def load_ch2(contents):
      Input('ch2-time', 'children')],
     [State('input-width', 'value'),
      State('input-height', 'value'),
-     State('input-pixelsperinch', 'value')]
+     State('input-pixelsperinch', 'value'),
+     State('upload-ch1', 'contents'),
+     State('upload-ch2', 'contents')]
 )
 def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
-                 width,height, pixelsperinch):
+                 width,height, pixelsperinch, \
+                 txt_ch1, txt_ch2):
     if n_clicks is None:
         raise PreventUpdate
-    
+    #load data
+    reader= EEGDataloader()
+    data_ch1, time_ch1= reader.load_txt_by_buttom(txt_ch1)
+    data_ch2, time_ch2= reader.load_txt_by_buttom(txt_ch2)
     assert len(data_ch1)== len(data_ch2)
+    #plot fig
     x_values_row = np.arange(0,len(data_ch1),1)
     fig= make_subplots(rows=2, cols=1,shared_xaxes=True,subplot_titles=[f'F3-P3', f'F4-P4'])
     fig.add_trace(go.Scatter(x=x_values_row, y=data_ch1, mode='lines'), row=1, col=1)
@@ -242,7 +229,7 @@ def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
 
    
 
-    return fig
+    return fig, time_ch1
 
 @app.callback(
     Output('annotation-info', 'children'),
