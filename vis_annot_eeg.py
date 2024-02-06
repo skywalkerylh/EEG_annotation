@@ -131,6 +131,8 @@ app.layout = html.Div([
     html.P('3. Input  :'),
     html.P('width:'),
     dcc.Input(id='input-width', type='number', placeholder='Enter width', value=1257),
+    html.P('height:'),
+    dcc.Input(id='input-height', type='number', placeholder='Enter height', value=598),
     html.P('pixelsperinch:'),
     dcc.Input(id='input-pixelsperinch', type='number', placeholder='Enter pixelsperinch', value=105),
     
@@ -194,10 +196,11 @@ def load_ch2(contents):
      Input('ch2-data', 'children'),
      Input('ch2-time', 'children')],
     [State('input-width', 'value'),
+     State('input-height', 'value'),
      State('input-pixelsperinch', 'value')]
 )
 def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
-                 width, pixelsperinch):
+                 width,height, pixelsperinch):
     if n_clicks is None:
         raise PreventUpdate
     
@@ -209,11 +212,12 @@ def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
 
     # adjust plot based on monitor
     x_start = 0
-    timebase = 30  # mm/sec
+    x_timebase , y_base= 30, 7  # mm/sec, mV/mm
     width_mm = width/ (pixelsperinch / 2.54)*10 # pixel to mm
-    x_end = int((sf-8)* ((width_mm / timebase)))
+    height_mm = height/ (pixelsperinch / 2.54)*10 # pixel to mm
+    x_end = int((sf-8)* ((width_mm / x_timebase)))
     initial_x_range= [x_values_row[x_start], x_values_row[x_end - 1]]
-    initial_y_range= [-50,50]
+    initial_y_range= [-height_mm*0.22875817*y_base/2, height_mm*0.22875817*y_base/2]
     
     # set ticks as string time
     tick_interval = 200
@@ -252,10 +256,14 @@ def rect_annotation_added(fig_data, time_ch1, content):
         return dash.no_update
     
     if 'shapes' in fig_data :
-
-        line = fig_data['shapes'][-1]
-        
-        if line['type'] == 'rect':
+       
+        # when only annotation is deleted shape is empty []
+        if len(fig_data['shapes'])==0 and len(annot_export)==1:
+            annot_export= pd.DataFrame(columns=['patient', 'start_idx', 'start_time', 'end_idx','end_time','duration_ms'])
+            print('Erase the only annotation')
+            print('annotation is empty now')
+        else:
+            line = fig_data['shapes'][-1]
             start_pos= int(line['x0'])
             end_pos= int(line['x1'])
             current_annotation = annotation.create_dataframe(time_ch1, start_pos, end_pos)
@@ -265,7 +273,6 @@ def rect_annotation_added(fig_data, time_ch1, content):
                 end_pos, current_annotation['end_time'].item(),
                 current_annotation['duration_ms'].item()
             )
-            
             annot_export= annotation.record_or_delete(current_annotation, annot_export)
                 
     return content
