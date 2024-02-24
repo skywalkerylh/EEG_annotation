@@ -42,22 +42,24 @@ class EEGDataloader:
         data, time= self.extractTimeValuefromtxt(io.StringIO(decoded.decode('utf-8')))
         data= self.valueConversion(data)
         return data, time
-    
+    def extract_patient_number_from_filename(self,filename):
+        parts = filename.split('_')
+        patient_number_part = parts[0].replace('P', '')
+       
+        return patient_number_part
     
 class Annotation:
     
-    def __init__(self, sf, patient):
-      
+    def __init__(self, sf):
         self.sf= sf
-        self.patient= patient
-        
-    def create_dataframe(self, time_ch1, start_pos, end_pos):
+
+    def create_dataframe(self, patient, time_ch1, start_pos, end_pos):
         start_time = time_ch1[start_pos]
         end_time = time_ch1[end_pos]
         duration_in_ms = int((end_pos - start_pos)/self.sf * 1000)
         
         annotation_data = {
-            'patient': [self.patient],
+            'patient': [patient],
             'start_idx': [start_pos],
             'start_time': [start_time],
             'end_idx': [end_pos],
@@ -96,31 +98,16 @@ class Annotation:
                 print(annot_export.shape)
         return annot_export
 
-patient=10
+#patient=10
 sf=128
 eeg_loader= EEGDataloader()
 annot_export= pd.DataFrame(columns=['patient', 'start_idx', 'start_time', 'end_idx','end_time','duration_ms'])
-annotation = Annotation(sf, patient)
+annotation = Annotation(sf)
 
 # web
 app = dash.Dash(__name__)
 app.layout = html.Div([
-    html.P('1. check browser resolution(width*height):'),
-    dcc.Link('Click here', href='https://mdigi.tools/browser-resolution/', target='_blank'),
-    html.Br(),
-    html.P('2. check pixel per inch :'),
-    dcc.Link('Click here', href='https://dpi.lv/', target='_blank'),
-    html.Br(),
-    
-    html.P('3. Input  :'),
-    html.P('width:'),
-    dcc.Input(id='input-width', type='number', placeholder='Enter width', value=1257),
-    html.P('height:'),
-    dcc.Input(id='input-height', type='number', placeholder='Enter height', value=598),
-    html.P('pixelsperinch:'),
-    dcc.Input(id='input-pixelsperinch', type='number', placeholder='Enter pixelsperinch', value=105),
-    
-    html.P('4. Upload   :'),
+    html.P('Upload   :'),
     html.P('EEG ch1 txt \n '),
     dcc.Upload(
     id='upload-ch1',
@@ -140,7 +127,7 @@ app.layout = html.Div([
     dcc.Graph(id='plot-container',
               figure={},
               config={'modeBarButtonsToAdd':['drawrect','eraseshape']}),
-    #html.Div(id='plot-container')
+  
     html.Button('Export annotations', id='export-annotations-button'),
     dcc.Download(id='export-annot-csv'),
     html.Pre(id='annotation-info', children='annotation info\n'),
@@ -148,26 +135,27 @@ app.layout = html.Div([
     html.Div(id='ch1-data', style={'display': 'none'}),
     html.Div(id='ch1-time', style={'display': 'none'}),
     html.Div(id='ch2-data', style={'display': 'none'}),
-    html.Div(id='ch2-time', style={'display': 'none'})
+    html.Div(id='ch2-time', style={'display': 'none'}),
+    html.Div(id='patient', style={'display': 'none'})
 ])
 # Define callback to update graph
 @app.callback(
     [Output('plot-container', 'figure'),
-     Output('ch1-time', 'children')],
+     Output('ch1-time', 'children'),
+     Output('patient', 'children')],
     [Input('update-button', 'n_clicks'),
      Input('ch1-data', 'children'),
      Input('ch1-time', 'children'),
      Input('ch2-data', 'children'),
-     Input('ch2-time', 'children')],
-    [State('input-width', 'value'),
-     State('input-height', 'value'),
-     State('input-pixelsperinch', 'value'),
-     State('upload-ch1', 'contents'),
-     State('upload-ch2', 'contents')]
+     Input('ch2-time', 'children'),
+     Input('patient', 'children')],
+    [State('upload-ch1', 'contents'),
+     State('upload-ch2', 'contents'),
+     State('upload-ch1', 'filename')]
 )
-def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
-                 width,height, pixelsperinch, \
-                 txt_ch1, txt_ch2):
+def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, patient, \
+                 #width,height, pixelsperinch, \
+                 txt_ch1, txt_ch2, filename):
     if n_clicks is None:
         raise PreventUpdate
     #load data
@@ -175,6 +163,8 @@ def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
     data_ch1, time_ch1= reader.load_txt_by_buttom(txt_ch1)
     data_ch2, time_ch2= reader.load_txt_by_buttom(txt_ch2)
     assert len(data_ch1)== len(data_ch2)
+    patient= reader.extract_patient_number_from_filename(filename)
+    
     #plot fig
     x_values_row = np.arange(0,len(data_ch1),1)
     fig= make_subplots(rows=2, cols=1,shared_xaxes=True,subplot_titles=[f'F3-P3', f'F4-P4'])
@@ -183,15 +173,12 @@ def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
 
     # adjust plot based on monitor
     x_start = 0
-    x_timebase , y_base= 30, 7  # mm/sec, mV/mm
-    width_mm = width/ (pixelsperinch / 2.54)*10 # pixel to mm
-    height_mm = height/ (pixelsperinch / 2.54)*10 # pixel to mm
-    x_end = int((sf-8)* ((width_mm / x_timebase)))
+    x_end= sf*10
     initial_x_range= [x_values_row[x_start], x_values_row[x_end - 1]]
-    initial_y_range= [-height_mm*0.22875817*y_base/2, height_mm*0.22875817*y_base/2]
+    initial_y_range= [min(data_ch1), max(data_ch1)]
     
     # set ticks as string time
-    tick_interval = 200
+    tick_interval = sf
     tick_positions = np.arange(0, len(x_values_row), tick_interval)
     tick_labels = time_ch1[::tick_interval]
     
@@ -199,29 +186,29 @@ def update_graph(n_clicks,data_ch1, time_ch1, data_ch2, time_ch2, \
     fig.update_layout(
         title=f'Patient {patient}',
         title_x= 0.5,
-        width= width+20,
         showlegend=False,
         margin=dict(l=10, r=10, b=0, t=40),
         dragmode='drawrect', # define dragmode
         newshape=dict(line_color='cyan')
     
     )
-    fig.update_xaxes(range=initial_x_range,tickvals=tick_positions, ticktext=tick_labels ,row=1, col=1)
-    fig.update_xaxes(range=initial_x_range,tickvals=tick_positions, ticktext=tick_labels, row=2, col=1)
-    fig.update_yaxes(range=initial_y_range, row=1, col=1, fixedrange=True)
-    fig.update_yaxes(range=initial_y_range, row=2, col=1, fixedrange=True)
+    fig.update_xaxes(range=initial_x_range,tickvals=tick_positions, ticktext=tick_labels ,row=1, col=1, dtick=128)
+    fig.update_xaxes(range=initial_x_range,tickvals=tick_positions, ticktext=tick_labels, row=2, col=1, dtick=128)
+    fig.update_yaxes(range=initial_y_range, row=1, col=1, fixedrange=True, dtick=50)
+    fig.update_yaxes(range=initial_y_range, row=2, col=1, fixedrange=True, dtick=50)
 
    
 
-    return fig, time_ch1
+    return fig, time_ch1, patient
 
 @app.callback(
     Output('annotation-info', 'children'),
     [Input('plot-container', 'relayoutData'),
      Input('ch1-time', 'children')],
-    [State('annotation-info', 'children')])
+    [State('annotation-info', 'children'),
+     State('patient', 'children')])
 
-def rect_annotation_added(fig_data, time_ch1, content):
+def rect_annotation_added(fig_data, time_ch1, content, patient):
     global annot_export
     if fig_data is None:
         return dash.no_update
@@ -237,7 +224,7 @@ def rect_annotation_added(fig_data, time_ch1, content):
             line = fig_data['shapes'][-1]
             start_pos= int(line['x0'])
             end_pos= int(line['x1'])
-            current_annotation = annotation.create_dataframe(time_ch1, start_pos, end_pos)
+            current_annotation = annotation.create_dataframe(patient, time_ch1, start_pos, end_pos)
             content= ""
             content= annotation.display(
                 start_pos, current_annotation['start_time'].item(),
@@ -252,9 +239,10 @@ def rect_annotation_added(fig_data, time_ch1, content):
     Output("export-annot-csv", "data"),
     [Input("export-annotations-button", "n_clicks"),
      Input('ch1-time', 'children')],
+    [State('patient', 'children')],
     prevent_initial_call=True,
 )
-def export_csv(n_clicks, time_ch1):
+def export_csv(n_clicks, time_ch1, patient):
     if n_clicks is None:
         raise PreventUpdate
     startime= time_ch1[0].replace(':', '')
