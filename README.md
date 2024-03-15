@@ -1,4 +1,7 @@
 # [EEG annotation website](https://labeleeg-unb5daapya-de.a.run.app/)
+
+![website overview](overview.png)
+
 - 輸入長、寬、Pixelperinch
 - 分別上傳EEG txt檔案(五分鐘)
 - 按下enter
